@@ -127,6 +127,17 @@ export class MetadataViewerProvider
           );
         }
       ),
+      vscode.commands.registerCommand(
+        "one.viewer.metadata.inference",
+        async (uri) => {
+          const filePath = uri.uri.fsPath;
+
+          vscode.commands.executeCommand(
+            "one.toolchain.inference",
+            filePath
+          );
+        }
+      ),
       // Add command registration here
     ];
 

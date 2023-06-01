@@ -138,6 +138,9 @@ export class ToolchainProvider implements vscode.TreeDataProvider<BaseNode> {
       vscode.commands.registerCommand("one.toolchain.runCfg", (cfg) =>
         provider.run(cfg)
       ),
+      vscode.commands.registerCommand("one.toolchain.inference", (model) => 
+        provider.inference(model)
+      ),
       vscode.commands.registerCommand(
         "one.toolchain.setDefaultToolchain",
         (toolchain) => provider.setDefaultToolchain(toolchain)
@@ -276,12 +279,10 @@ export class ToolchainProvider implements vscode.TreeDataProvider<BaseNode> {
     return true;
   }
 
-  public _run(cfg: string): boolean {
-    /* istanbul ignore next */
-    const notifySuccess = () => {
-      vscode.window.showInformationMessage("Onecc has run successfully.");
-    };
-
+  private checkAvailableToolchain(): [
+    ToolchainEnv | undefined,
+    Toolchain | undefined
+  ] {
     /* istanbul ignore next */
     const notifyGuideline = () => {
       this.error(
@@ -296,26 +297,40 @@ export class ToolchainProvider implements vscode.TreeDataProvider<BaseNode> {
       });
     };
 
-    /* istanbul ignore next */
-    const notifyError = () => {
-      this.error("Running onecc has failed.");
-    };
-
     const activeToolchainEnv = DefaultToolchain.getInstance().getToolchainEnv();
     const activeToolchain = DefaultToolchain.getInstance().getToolchain();
 
     if (!activeToolchainEnv || !activeToolchain) {
       notifyGuideline();
+      return [undefined, undefined];
+    }
+
+    return [activeToolchainEnv, activeToolchain];
+  }
+
+  public _run(cfg: string): boolean {
+    /* istanbul ignore next */
+    const notifySuccess = () => {
+      vscode.window.showInformationMessage("Onecc has run successfully.");
+    };
+
+    /* istanbul ignore next */
+    const notifyError = () => {
+      this.error("Running onecc has failed.");
+    };
+
+    const [toolchainEnv, toolchain] = this.checkAvailableToolchain();
+    if (toolchainEnv === undefined || toolchain === undefined) {
       return false;
     }
 
     Logger.info(
       this.tag,
       `Run onecc with ${cfg} cfg and ${
-        activeToolchain.info.name
-      }-${activeToolchain.info.version?.str()} toolchain.`
+        toolchain.info.name
+      }-${toolchain.info.version?.str()} toolchain.`
     );
-    activeToolchainEnv.run(cfg, activeToolchain).then(
+    toolchainEnv.run(cfg, toolchain).then(
       () => notifySuccess(),
       () => notifyError()
     );
@@ -329,6 +344,43 @@ export class ToolchainProvider implements vscode.TreeDataProvider<BaseNode> {
       return this._run(cfg);
     }
     return false;
+  }
+
+  public inference(
+    model: string,
+    options?: Map<string, string>
+  ): string | undefined {
+    /* istanbul ignore next */
+    const notifySuccess = () => {
+      vscode.window.showInformationMessage("Inference successfully.");
+    };
+    /* istanbul ignore next */
+    const notifyError = () => {
+      this.error("Inference has failed.");
+    };
+
+    const [toolchainEnv, toolchain] = this.checkAvailableToolchain();
+    if (toolchainEnv === undefined || toolchain === undefined) {
+      return;
+    }
+
+    Logger.info(
+      this.tag,
+      `Inference ${model} file using ${
+        toolchain.info.name
+      }-${toolchain.info.version?.str()} toolchain.`
+    );
+
+    toolchainEnv.inference(model, options, toolchain).then(
+      (result: string) => {
+        notifySuccess();
+        return result;
+      },
+      () => {
+        notifyError();
+      }
+    );
+    return;
   }
 
   public setDefaultToolchain(tnode: ToolchainNode): boolean {
